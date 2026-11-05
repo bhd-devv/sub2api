@@ -7,6 +7,7 @@ This directory contains files for deploying Sub2API on Linux servers and Apple-s
 | Method | Best For | Setup Wizard |
 |--------|----------|--------------|
 | **Docker Compose** | Quick setup, all-in-one | Not needed (auto-setup) |
+| **[Coolify](./COOLIFY.md)** | Build and deploy this repository with PostgreSQL and Redis | Not needed (auto-setup) |
 | **Apple container** | Native local stack on macOS 26 | Not needed (auto-setup) |
 | **Binary Install** | Production servers, systemd | Web-based wizard |
 
@@ -15,6 +16,8 @@ This directory contains files for deploying Sub2API on Linux servers and Apple-s
 | File | Description |
 |------|-------------|
 | `docker-compose.yml` | Docker Compose configuration (named volumes) |
+| `../docker-compose.coolify.yml` | Coolify source build with PostgreSQL and Redis |
+| `COOLIFY.md` | Coolify configuration, secrets, persistence, and deployment guide |
 | `docker-compose.local.yml` | Docker Compose configuration (local directories, easy migration) |
 | `docker-deploy.sh` | **One-click Docker deployment script (recommended)** |
 | `apple-container.sh` | Native Apple `container` lifecycle script |

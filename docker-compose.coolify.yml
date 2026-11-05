@@ -1,0 +1,112 @@
+# Coolify: Docker Compose build pack, base directory /,
+# Docker Compose location /docker-compose.coolify.yml.
+# See deploy/COOLIFY.md for environment variables and domain setup.
+services:
+  sub2api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GOPROXY: https://proxy.golang.org,direct
+        GOSUMDB: sum.golang.org
+        NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 100000
+        hard: 100000
+    expose:
+      - "8080"
+    volumes:
+      - sub2api_data:/app/data
+    environment:
+      # Coolify generates a domain and routes it to this service on port 8080.
+      SERVICE_URL_SUB2API_8080: /
+      AUTO_SETUP: "true"
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: "8080"
+      SERVER_MODE: release
+      RUN_MODE: ${RUN_MODE:-standard}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_USER: ${POSTGRES_USER:-sub2api}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}
+      DATABASE_DBNAME: ${POSTGRES_DB:-sub2api}
+      DATABASE_SSLMODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in Coolify}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in Coolify}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in Coolify}
+      JWT_SECRET: ${JWT_SECRET:?Set a persistent JWT_SECRET in Coolify}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Set a persistent TOTP_ENCRYPTION_KEY in Coolify}
+      SETUP_MIGRATION_TIMEOUT_SECONDS: ${SETUP_MIGRATION_TIMEOUT_SECONDS:-0}
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-}
+      TZ: ${TZ:-Europe/Kyiv}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      # Keep PostgreSQL 18 data in the named volume, including after recreation.
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_USER: ${POSTGRES_USER:-sub2api}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}
+      POSTGRES_DB: ${POSTGRES_DB:-sub2api}
+      TZ: ${TZ:-Europe/Kyiv}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" &&
+          psql -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -Atqc 'SELECT 1' >/dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command:
+      - redis-server
+      - --save
+      - "60"
+      - "1"
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --requirepass
+      - ${REDIS_PASSWORD:?Set REDIS_PASSWORD in Coolify}
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in Coolify}
+      TZ: ${TZ:-Europe/Kyiv}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  sub2api_data:
+  postgres_data:
+  redis_data:
